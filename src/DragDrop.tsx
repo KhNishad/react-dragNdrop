@@ -7,38 +7,37 @@ interface Task {
 }
 
 const DragDropExample = () => {
-  const [tasks, setTasks] = useState<Task[]>();
-  const [dropIndicator, setDropIndicator] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("http://localhost:3001/tasks")
-      .then((res) => res.json())
-      .then((data) => {
-        setTasks(data);
-      })
-      .catch((err) => {
-        console.error("err", err);
-        if (!sessionStorage.getItem("showError")) {
-          const ok = window.confirm(
-            "Make sure to run the JSON server by running 'npm run server'"
-          );
-          if (ok) {
-            window.location.reload();
-            sessionStorage.setItem("showError", "true");
-          }
-        }
-      });
-  }, []);
+  const [position, setPosition] = useState({ x: 100, y: 100 });
+  const [dragging, setDragging] = useState(false);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
 
-  const updateTask = (task: Task) => {
-    fetch(`http://localhost:3001/tasks/${task.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(task),
+  const handleMouseDown = (e) => {
+    setDragging(true);
+    setOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
     });
   };
+
+  const handleMouseMove = (e) => {
+    if (dragging) {
+      setPosition({
+        x: e.clientX - offset.x,
+        y: e.clientY - offset.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setDragging(false);
+  };
+  const [tasks, setTasks] = useState([
+    { id: 1, title: "Task 1", status: "todo" },
+    { id: 2, title: "Task 2", status: "todo" },
+    { id: 3, title: "Task 3", status: "todo" },
+  ]);
+  const [dropIndicator, setDropIndicator] = useState<string | null>(null);
 
   const handleDragStart = (
     e: React.DragEvent<HTMLDivElement>,
@@ -57,13 +56,35 @@ const DragDropExample = () => {
     const taskId = e.dataTransfer.getData("text/plain");
 
     const task = tasks?.find((task) => +task.id === +taskId);
+    const draggedTask = tasks.find((task) => task.id === parseInt(taskId, 10));
+
+    const dropTargetKey = e.target.getAttribute("data-task-id");
+
+
 
     if (task) {
       task.status = status;
-      updateTask(task);
-      setTasks((prevTasks) =>
-        prevTasks?.map((_task) => (_task.id === task?.id ? task : _task))
-      );
+    }
+    if (task?.status == status) {
+      if (dropTargetKey) {
+        const targetTaskIndex = tasks.findIndex(
+          (task) => task.id === parseInt(dropTargetKey, 10)
+        );
+        const draggedTaskIndex = tasks.findIndex(
+          (task) => task.id === draggedTask?.id
+        );
+        if (
+          draggedTaskIndex !== -1 &&
+          targetTaskIndex !== -1 &&
+          draggedTaskIndex !== targetTaskIndex
+        ) {
+          const updatedTasks = [...tasks];
+          updatedTasks[draggedTaskIndex] = tasks[targetTaskIndex];
+          updatedTasks[targetTaskIndex] = tasks[draggedTaskIndex];
+
+          setTasks(updatedTasks);
+        }
+      }
     }
 
     setDropIndicator(null);
@@ -80,6 +101,7 @@ const DragDropExample = () => {
       .map((task) => (
         <div
           key={task.id}
+          data-task-id={task.id}
           draggable
           onDragStart={(e) => handleDragStart(e, task.id)}
           onDragEnd={handleDragEnd}
@@ -92,9 +114,11 @@ const DragDropExample = () => {
       ));
   };
 
+  
+
   return (
-    <div className="flex flex-col p-6 h-screen dark:bg-gray-900">
-      <div className="grid grid-cols-3 gap-2">
+    <div className="flex flex-col p-6 h-screen dark:bg-gray-900 py-10">
+      <div className="grid grid-cols-3 gap-2 ">
         <h2 className="text-center dark:text-white">Todo</h2>
         <h2 className="text-center dark:text-white">In Progress</h2>
         <h2 className="text-center dark:text-white">Done</h2>
@@ -115,7 +139,7 @@ const DragDropExample = () => {
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, "in-progress")}
           className={`flex flex-col items-center justify-start w-full border-2 border-dashed p-0.5 gap-1 rounded ${
-            dropIndicator === "in-progress" ? "bg-blue-100 " : ""
+            dropIndicator === "in-progress" ? "bg-red-400 " : ""
           }`}
         >
           {renderTasks("in-progress")}
@@ -126,12 +150,30 @@ const DragDropExample = () => {
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, "done")}
           className={`flex flex-col items-center justify-start w-full border-2 border-dashed p-0.5 gap-1 rounded ${
-            dropIndicator === "done" ? "bg-blue-100 " : ""
+            dropIndicator === "done" ? "bg-green-300 " : ""
           }`}
         >
           {renderTasks("done")}
         </div>
+
+       
       </div>
+      <div
+          className="draggable"
+          style={{
+            position: "absolute",
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            cursor: dragging ? "grabbing" : "grab",
+            background:'red'
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          Drag me around
+        </div>
     </div>
   );
 };
